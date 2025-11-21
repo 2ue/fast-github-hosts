@@ -28,9 +28,8 @@ jobs:
         id: run_script
         run: |
           python generate_github_hosts_pro.py \
-            --level EXTENDED \
+            --level extended \
             --output github_hosts_pro \
-            --cache \
             --top-ip 3
 
           # Extract statistics from generated file
