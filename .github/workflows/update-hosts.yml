@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: '0 */2 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'generate_github_hosts_pro.py'
+      - 'requirements.txt'
+      - '.github/workflows/update-hosts.yml'
 
 permissions:
   contents: write
@@ -29,8 +36,7 @@ jobs:
         run: |
           python generate_github_hosts_pro.py \
             --level extended \
-            --output github_hosts_pro \
-            --top-ip 3
+            --output github_hosts_pro
 
           # Extract statistics from generated file
           TOTAL_DOMAINS=$(grep -c "^[0-9]" github_hosts_pro || echo "0")
