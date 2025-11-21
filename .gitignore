@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+*.bak
+*.tmp
+
+# Cache files
+*.cache
+*.cache.json
+.github_hosts_cache.json
+
+# Logs
+*.log
+
+# Test outputs and Release temp files
+github_hosts_test
+github_hosts_ultimate_test
+github_hosts_*[0-9]
+github_hosts_pro_*[0-9]
+*.txt.bak
+
+# Temporary files
+temp/
+tmp/
