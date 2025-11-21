@@ -34,18 +34,50 @@ jobs:
       - name: Run script
         id: run_script
         run: |
+          # Backup old hosts file if exists
+          if [ -f "github_hosts_pro" ]; then
+            cp github_hosts_pro github_hosts_pro.old
+          fi
+
+          # Generate new hosts file
           python generate_github_hosts_pro.py \
             --level extended \
             --output github_hosts_pro
 
           # Extract statistics from generated file
           TOTAL_DOMAINS=$(grep -c "^[0-9]" github_hosts_pro || echo "0")
-          SUCCESS_COUNT=$(grep -oP "(?<=域名总数: )\d+/\d+" github_hosts_pro | head -1 || echo "N/A")
+          SUCCESS_COUNT=$(grep -oP "(?<=域名数量: )\d+/\d+" github_hosts_pro | head -1 || echo "N/A")
 
           echo "total_domains=${TOTAL_DOMAINS}" >> $GITHUB_OUTPUT
           echo "success_count=${SUCCESS_COUNT}" >> $GITHUB_OUTPUT
 
+      - name: Check hosts changes
+        id: check_changes
+        run: |
+          if [ -f "github_hosts_pro.old" ]; then
+            # Extract hosts entries only (ignore headers with timestamps)
+            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_pro.old | grep -E "^[0-9]" > old_hosts.txt || true
+            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_pro | grep -E "^[0-9]" > new_hosts.txt || true
+
+            # Compare hosts entries
+            if diff -q old_hosts.txt new_hosts.txt > /dev/null 2>&1; then
+              echo "hosts_changed=false" >> $GITHUB_OUTPUT
+              echo "No changes in hosts entries"
+            else
+              echo "hosts_changed=true" >> $GITHUB_OUTPUT
+              echo "Hosts entries changed"
+            fi
+
+            # Cleanup
+            rm -f github_hosts_pro.old old_hosts.txt new_hosts.txt
+          else
+            # First run, always consider as changed
+            echo "hosts_changed=true" >> $GITHUB_OUTPUT
+            echo "First run, no previous hosts file"
+          fi
+
       - name: Generate commit message
+        if: steps.check_changes.outputs.hosts_changed == 'true'
         id: commit_msg
         run: |
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
@@ -63,6 +95,7 @@ jobs:
           cat commit_message.txt
 
       - name: Commit and push
+        if: steps.check_changes.outputs.hosts_changed == 'true'
         id: commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
@@ -70,7 +103,7 @@ jobs:
           file_pattern: github_hosts_pro
 
       - name: Set date for release
-        if: steps.commit.outputs.changes_detected == 'true' && github.event_name == 'schedule'
+        if: steps.check_changes.outputs.hosts_changed == 'true' && github.event_name == 'schedule'
         id: date
         run: |
           HOUR=$(date -u +%H)
