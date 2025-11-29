@@ -105,10 +105,16 @@ ultra_hosts
 ultra_hosts.*
 github_hosts_pro
 github_hosts_pro.*
-github_hosts_ultimate
-github_hosts_ultimate.*
 github_hosts_test
 github_hosts_ultimate_test
+
+# github_hosts_ultimate - 不忽略，需要提交到仓库
+!github_hosts_ultimate
+# 但是忽略其衍生文件
+github_hosts_ultimate.old
+github_hosts_ultimate.bak
+github_hosts_ultimate.tmp
+github_hosts_ultimate_*
 
 # Test outputs with numbers
 github_hosts_*[0-9]
