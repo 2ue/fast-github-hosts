@@ -104,33 +104,47 @@ jobs:
           commit_message_file: commit_message.txt
           file_pattern: github_hosts_ultimate
 
-      - name: Set date for release
-        if: steps.check_changes.outputs.hosts_changed == 'true' && github.event_name == 'schedule'
-        id: date
+      - name: Prepare release info
+        if: steps.check_changes.outputs.hosts_changed == 'true'
+        id: release_info
         run: |
-          HOUR=$(date -u +%H)
-          # Release at 00:00 UTC (08:00 UTC+8) and 12:00 UTC (20:00 UTC+8)
-          if [ "$HOUR" = "00" ] || [ "$HOUR" = "12" ]; then
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "date=$(TZ='Asia/Shanghai' date +%Y%m%d)" >> $GITHUB_OUTPUT
-            echo "date_display=$(TZ='Asia/Shanghai' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
-          else
-            echo "should_release=false" >> $GITHUB_OUTPUT
-          fi
+          # 使用日期+时间作为tag，确保唯一性
+          TAG=$(TZ='Asia/Shanghai' date +%Y%m%d-%H%M)
+          DATE_DISPLAY=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')
+          TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
+
+          echo "tag=v${TAG}" >> $GITHUB_OUTPUT
+          echo "date_display=${DATE_DISPLAY}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        if: steps.date.outputs.should_release == 'true'
+        if: steps.check_changes.outputs.hosts_changed == 'true'
         uses: ncipollo/release-action@v1
         with:
-          tag: v${{ steps.date.outputs.date }}
-          name: GitHub Hosts Ultimate - ${{ steps.date.outputs.date_display }}
+          tag: ${{ steps.release_info.outputs.tag }}
+          name: GitHub Hosts Ultimate - ${{ steps.release_info.outputs.date_display }}
           body: |
-            Auto-generated hosts file for ${{ steps.date.outputs.date_display }}
+            🚀 Auto-generated GitHub Hosts file
 
+            **Update Time**: ${{ steps.release_info.outputs.timestamp }} (UTC+8)
             **Version**: Ultimate 3.0.0
             **Level**: FULL (All domains)
-            **Total entries**: ${{ steps.run_script.outputs.total_domains }}
-            **Success rate**: ${{ steps.run_script.outputs.success_count }}
+            **Total Entries**: ${{ steps.run_script.outputs.total_domains }}
+            **Success Rate**: ${{ steps.run_script.outputs.success_count }}
+            **Top IPs**: 3 per domain
+
+            ---
+
+            ### 使用方法
+
+            下载 `github_hosts_ultimate` 文件，将内容追加到系统 hosts 文件：
+            - Windows: `C:\Windows\System32\drivers\etc\hosts`
+            - Linux/Mac: `/etc/hosts`
+
+            ```bash
+            # Linux/Mac
+            sudo curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.release_info.outputs.tag }}/github_hosts_ultimate >> /etc/hosts
+            ```
           artifacts: github_hosts_ultimate
-          allowUpdates: true
+          allowUpdates: false
           makeLatest: true
