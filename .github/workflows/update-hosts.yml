@@ -2,13 +2,14 @@ name: Update GitHub Hosts
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
   push:
     branches:
       - main
     paths:
-      - 'generate_github_hosts_pro.py'
+      - 'generate_github_hosts_ultimate.py'
+      - 'github_domains.json'
       - 'requirements.txt'
       - '.github/workflows/update-hosts.yml'
 
@@ -35,18 +36,18 @@ jobs:
         id: run_script
         run: |
           # Backup old hosts file if exists
-          if [ -f "github_hosts_pro" ]; then
-            cp github_hosts_pro github_hosts_pro.old
+          if [ -f "github_hosts_ultimate" ]; then
+            cp github_hosts_ultimate github_hosts_ultimate.old
           fi
 
           # Generate new hosts file
-          python generate_github_hosts_pro.py \
-            --level extended \
-            --output github_hosts_pro
+          python generate_github_hosts_ultimate.py \
+            --level full \
+            --output github_hosts_ultimate
 
           # Extract statistics from generated file
-          TOTAL_DOMAINS=$(grep -c "^[0-9]" github_hosts_pro || echo "0")
-          SUCCESS_COUNT=$(grep -oP "(?<=域名数量: )\d+/\d+" github_hosts_pro | head -1 || echo "N/A")
+          TOTAL_DOMAINS=$(grep -c "^[0-9]" github_hosts_ultimate || echo "0")
+          SUCCESS_COUNT=$(grep -oP "(?<=成功率: )\d+/\d+" github_hosts_ultimate | head -1 || echo "N/A")
 
           echo "total_domains=${TOTAL_DOMAINS}" >> $GITHUB_OUTPUT
           echo "success_count=${SUCCESS_COUNT}" >> $GITHUB_OUTPUT
@@ -54,10 +55,10 @@ jobs:
       - name: Check hosts changes
         id: check_changes
         run: |
-          if [ -f "github_hosts_pro.old" ]; then
+          if [ -f "github_hosts_ultimate.old" ]; then
             # Extract hosts entries only (ignore headers with timestamps)
-            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_pro.old | grep -E "^[0-9]" > old_hosts.txt || true
-            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_pro | grep -E "^[0-9]" > new_hosts.txt || true
+            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_ultimate.old | grep -E "^[0-9]" > old_hosts.txt || true
+            sed -n '/^# ==.*GitHub Hosts Start/,/^# ==.*GitHub Hosts End/p' github_hosts_ultimate | grep -E "^[0-9]" > new_hosts.txt || true
 
             # Compare hosts entries
             if diff -q old_hosts.txt new_hosts.txt > /dev/null 2>&1; then
@@ -69,7 +70,7 @@ jobs:
             fi
 
             # Cleanup
-            rm -f github_hosts_pro.old old_hosts.txt new_hosts.txt
+            rm -f github_hosts_ultimate.old old_hosts.txt new_hosts.txt
           else
             # First run, always consider as changed
             echo "hosts_changed=true" >> $GITHUB_OUTPUT
@@ -86,10 +87,11 @@ jobs:
           Auto update GitHub Hosts
 
           - Update time: ${TIMESTAMP} (UTC+8)
-          - Domain level: EXTENDED
+          - Domain level: FULL (All domains)
           - Total entries: ${{ steps.run_script.outputs.total_domains }}
           - Success rate: ${{ steps.run_script.outputs.success_count }}
           - Top IPs: 3 per domain
+          - Version: Ultimate 3.0.0
           EOF
 
           cat commit_message.txt
@@ -100,14 +102,15 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message_file: commit_message.txt
-          file_pattern: github_hosts_pro
+          file_pattern: github_hosts_ultimate
 
       - name: Set date for release
         if: steps.check_changes.outputs.hosts_changed == 'true' && github.event_name == 'schedule'
         id: date
         run: |
           HOUR=$(date -u +%H)
-          if [ "$HOUR" = "16" ] || [ "$HOUR" = "18" ]; then
+          # Release at 00:00 UTC (08:00 UTC+8) and 12:00 UTC (20:00 UTC+8)
+          if [ "$HOUR" = "00" ] || [ "$HOUR" = "12" ]; then
             echo "should_release=true" >> $GITHUB_OUTPUT
             echo "date=$(TZ='Asia/Shanghai' date +%Y%m%d)" >> $GITHUB_OUTPUT
             echo "date_display=$(TZ='Asia/Shanghai' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
@@ -120,8 +123,14 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: v${{ steps.date.outputs.date }}
-          name: GitHub Hosts Pro - ${{ steps.date.outputs.date_display }}
-          body: Auto-generated hosts file for ${{ steps.date.outputs.date_display }}
-          artifacts: github_hosts_pro
+          name: GitHub Hosts Ultimate - ${{ steps.date.outputs.date_display }}
+          body: |
+            Auto-generated hosts file for ${{ steps.date.outputs.date_display }}
+
+            **Version**: Ultimate 3.0.0
+            **Level**: FULL (All domains)
+            **Total entries**: ${{ steps.run_script.outputs.total_domains }}
+            **Success rate**: ${{ steps.run_script.outputs.success_count }}
+          artifacts: github_hosts_ultimate
           allowUpdates: true
           makeLatest: true
