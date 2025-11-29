@@ -15,14 +15,10 @@ import json
 import argparse
 import os
 import logging
-import signal
 import sys
-import threading
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
 
 # ==================== 版本信息 ====================
 VERSION = "3.0.0"
@@ -41,95 +37,39 @@ logger = logging.getLogger(__name__)
 
 # ==================== 配置区 ====================
 
-# 域名分级配置
-DOMAIN_LEVELS = {
-    'core': [
-        # ===== 核心服务（20个）=====
-        'github.com', 'api.github.com', 'gist.github.com', 'codeload.github.com',
-        'github.blog', 'github.community', 'github.dev', 'alive.github.com',
-        'live.github.com', 'education.github.com',
-        # ===== CDN与静态资源（5个）=====
-        'github.githubassets.com', 'github.io', 'github.map.fastly.net',
-        'github.global.ssl.fastly.net', 'githubstatus.com',
-        # ===== UserContent核心（5个）=====
-        'raw.githubusercontent.com', 'objects.githubusercontent.com',
-        'avatars.githubusercontent.com', 'camo.githubusercontent.com',
-        'user-images.githubusercontent.com',
-    ],
-    'extended': [
-        # ===== 更多UserContent（16个）=====
-        'raw.github.com', 'objects-origin.githubusercontent.com',
-        'release-assets.githubusercontent.com', 'github-releases.githubusercontent.com',
-        'github-registry-files.githubusercontent.com', 'avatars0.githubusercontent.com',
-        'avatars1.githubusercontent.com', 'avatars2.githubusercontent.com',
-        'avatars3.githubusercontent.com', 'avatars4.githubusercontent.com',
-        'avatars5.githubusercontent.com', 'private-user-images.githubusercontent.com',
-        'cloud.githubusercontent.com', 'desktop.githubusercontent.com',
-        'favicons.githubusercontent.com', 'media.githubusercontent.com',
-        'pkg-containers.githubusercontent.com',
-        # ===== 包管理器（13个）=====
-        'ghcr.io', 'maven.pkg.github.com', 'npm.pkg.github.com',
-        'npm-proxy.pkg.github.com', 'npm-beta.pkg.github.com',
-        'npm-beta-proxy.pkg.github.com', 'nuget.pkg.github.com',
-        'rubygems.pkg.github.com', 'pypi.pkg.github.com',
-        'swift.pkg.github.com', 'docker.pkg.github.com',
-        'docker-proxy.pkg.github.com', 'containers.pkg.github.com',
-        # ===== AWS S3（5个）=====
-        'github-cloud.s3.amazonaws.com', 'github-com.s3.amazonaws.com',
-        'github-production-release-asset-2e65be.s3.amazonaws.com',
-        'github-production-user-asset-6210df.s3.amazonaws.com',
-        'github-production-repository-file-5c1aeb.s3.amazonaws.com',
-        # ===== Copilot（7个）=====
-        'githubcopilot.com', 'api.githubcopilot.com',
-        'api.individual.githubcopilot.com', 'copilot-proxy.githubusercontent.com',
-        'copilot-telemetry.githubusercontent.com', 'default.exp-tas.com',
-        'collector.github.com', 'central.github.com',
-    ],
-    'optional': [
-        # ===== Actions（49个）=====
-        'pipelines.actions.githubusercontent.com', 'vstoken.actions.githubusercontent.com',
-        'broker.actions.githubusercontent.com', 'launch.actions.githubusercontent.com',
-        'runner-auth.actions.githubusercontent.com', 'tokenghub.actions.githubusercontent.com',
-        'setup-tools.actions.githubusercontent.com', 'pkg.actions.githubusercontent.com',
-        'results-receiver.actions.githubusercontent.com', 'mpsghub.actions.githubusercontent.com',
-        'pipelinesghubeus1.actions.githubusercontent.com', 'pipelinesghubeus2.actions.githubusercontent.com',
-        'pipelinesghubeus3.actions.githubusercontent.com', 'pipelinesghubeus4.actions.githubusercontent.com',
-        'pipelinesghubeus5.actions.githubusercontent.com', 'pipelinesghubeus6.actions.githubusercontent.com',
-        'pipelinesghubeus7.actions.githubusercontent.com', 'pipelinesghubeus8.actions.githubusercontent.com',
-        'pipelinesghubeus9.actions.githubusercontent.com', 'pipelinesghubeus10.actions.githubusercontent.com',
-        'pipelinesghubeus11.actions.githubusercontent.com', 'pipelinesghubeus12.actions.githubusercontent.com',
-        'pipelinesghubeus13.actions.githubusercontent.com', 'pipelinesghubeus14.actions.githubusercontent.com',
-        'pipelinesghubeus15.actions.githubusercontent.com', 'pipelinesghubeus20.actions.githubusercontent.com',
-        'pipelinesghubeus21.actions.githubusercontent.com', 'pipelinesghubeus22.actions.githubusercontent.com',
-        'pipelinesghubeus23.actions.githubusercontent.com', 'pipelinesghubeus24.actions.githubusercontent.com',
-        'pipelinesghubeus25.actions.githubusercontent.com', 'pipelinesghubeus26.actions.githubusercontent.com',
-        'pipelinesproxcnc1.actions.githubusercontent.com', 'pipelinesproxcus1.actions.githubusercontent.com',
-        'pipelinesproxeau1.actions.githubusercontent.com', 'pipelinesproxsdc1.actions.githubusercontent.com',
-        'pipelinesproxweu1.actions.githubusercontent.com', 'pipelinesproxwus31.actions.githubusercontent.com',
-        'runnerghubeus1.actions.githubusercontent.com', 'runnerghubeus20.actions.githubusercontent.com',
-        'runnerghubeus21.actions.githubusercontent.com', 'runnerghubwus31.actions.githubusercontent.com',
-        'runnerproxcnc1.actions.githubusercontent.com', 'runnerproxcus1.actions.githubusercontent.com',
-        'runnerproxeau1.actions.githubusercontent.com', 'runnerproxsdc1.actions.githubusercontent.com',
-        'runnerproxweu1.actions.githubusercontent.com', 'run-actions-1-azure-eastus.actions.githubusercontent.com',
-        'run-actions-2-azure-eastus.actions.githubusercontent.com', 'run-actions-3-azure-eastus.actions.githubusercontent.com',
-        # ===== Azure Blob（24个）=====
-        'productionresultssa0.blob.core.windows.net', 'productionresultssa1.blob.core.windows.net',
-        'productionresultssa2.blob.core.windows.net', 'productionresultssa3.blob.core.windows.net',
-        'productionresultssa4.blob.core.windows.net', 'productionresultssa5.blob.core.windows.net',
-        'productionresultssa6.blob.core.windows.net', 'productionresultssa7.blob.core.windows.net',
-        'productionresultssa8.blob.core.windows.net', 'productionresultssa9.blob.core.windows.net',
-        'productionresultssa10.blob.core.windows.net', 'productionresultssa11.blob.core.windows.net',
-        'productionresultssa12.blob.core.windows.net', 'productionresultssa13.blob.core.windows.net',
-        'productionresultssa14.blob.core.windows.net', 'productionresultssa15.blob.core.windows.net',
-        'productionresultssa16.blob.core.windows.net', 'productionresultssa17.blob.core.windows.net',
-        'productionresultssa18.blob.core.windows.net', 'productionresultssa19.blob.core.windows.net',
-        'mavenregistryv2prod.blob.core.windows.net', 'npmregistryv2prod.blob.core.windows.net',
-        'nugetregistryv2prod.blob.core.windows.net', 'rubygemsregistryv2prod.blob.core.windows.net',
-        # ===== 其他（4个）=====
-        'tuf-repo.github.com', 'fulcio.githubapp.com',
-        'timestamp.githubapp.com', 'vscode.dev',
-    ]
+# 域名配置文件路径
+DOMAINS_FILE = 'github_domains.json'
+
+def load_github_domains() -> List[str]:
+    """从配置文件加载GitHub域名列表"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        domains_path = os.path.join(script_dir, DOMAINS_FILE)
+
+        with open(domains_path, 'r', encoding='utf-8') as f:
+            domains = json.load(f)
+
+        return domains
+    except FileNotFoundError:
+        logger.error(f"找不到域名配置文件 {DOMAINS_FILE}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        logger.error(f"域名配置文件格式错误: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"加载域名配置失败: {e}")
+        sys.exit(1)
+
+# 加载所有域名
+ALL_DOMAINS = load_github_domains()
+
+# 域名分级数量配置(基于ALL_DOMAINS的切片而非硬编码分组)
+DOMAIN_COUNT = {
+    'core': 30,       # 核心域名:前30个
+    'extended': 70,   # 扩展域名:前70个
+    'full': len(ALL_DOMAINS)  # 全部域名
 }
+
 
 # DoH服务器
 DOH_SERVERS = [
@@ -151,42 +91,6 @@ TOP_IP_COUNT = 3
 # 缓存配置
 CACHE_FILE = '.github_hosts_cache.json'
 CACHE_ENABLED = True
-
-# Daemon配置
-DEFAULT_DAEMON_INTERVAL = 600  # 10分钟
-DEFAULT_HTTP_PORT = 8080
-
-# 全局状态
-class GlobalState:
-    """全局状态管理"""
-    def __init__(self):
-        self.results = {}
-        self.stats = {}
-        self.last_update = None
-        self.is_running = True
-        self.lock = threading.Lock()
-
-    def update_results(self, results):
-        with self.lock:
-            self.results = results
-            self.last_update = datetime.now()
-
-    def get_results(self):
-        with self.lock:
-            return self.results.copy()
-
-    def update_stats(self, stats):
-        with self.lock:
-            self.stats = stats
-
-    def get_stats(self):
-        with self.lock:
-            return self.stats.copy()
-
-    def stop(self):
-        self.is_running = False
-
-global_state = GlobalState()
 
 # ==================== DoH查询模块 ====================
 
@@ -421,13 +325,9 @@ def get_fastest_ips(domain: str, use_doh: bool = True, use_cache: bool = True, u
 # ==================== 文件生成 ====================
 
 def get_domain_list(level: str) -> List[str]:
-    """获取域名列表"""
-    if level == 'core':
-        return DOMAIN_LEVELS['core']
-    elif level == 'extended':
-        return DOMAIN_LEVELS['core'] + DOMAIN_LEVELS['extended']
-    else:  # full
-        return DOMAIN_LEVELS['core'] + DOMAIN_LEVELS['extended'] + DOMAIN_LEVELS['optional']
+    """获取域名列表(从ALL_DOMAINS中按数量切片)"""
+    count = DOMAIN_COUNT.get(level, DOMAIN_COUNT['core'])
+    return ALL_DOMAINS[:count]
 
 def generate_hosts_content(results: Dict, level: str, multi_ip: bool = True) -> str:
     """生成hosts文件内容"""
@@ -515,9 +415,6 @@ def generate_hosts_file(output_file: str, level: str, use_doh: bool, use_cache: 
         'use_cache': use_cache,
         'multi_ip': multi_ip
     }
-
-    global_state.update_results(results)
-    global_state.update_stats(stats)
 
     logger.info("=" * 70)
     logger.info(f"✅ Hosts文件已生成: {output_file}")
@@ -623,181 +520,6 @@ def generate_stats_report(results: Dict, stats: Dict, output_file: str = 'stats_
     except Exception as e:
         logger.error(f"生成统计报告失败: {e}")
 
-# ==================== HTTP API服务 ====================
-
-class HostsHTTPHandler(BaseHTTPRequestHandler):
-    """HTTP请求处理器"""
-
-    def log_message(self, format, *args):
-        """重写日志方法"""
-        logger.debug(f"{self.address_string()} - {format % args}")
-
-    def do_GET(self):
-        """处理GET请求"""
-        parsed_path = urlparse(self.path)
-        path = parsed_path.path
-
-        try:
-            if path == '/':
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(self._generate_index_page().encode())
-
-            elif path == '/hosts':
-                self.send_response(200)
-                self.send_header('Content-type', 'text/plain; charset=utf-8')
-                self.end_headers()
-                results = global_state.get_results()
-                if results:
-                    content = generate_hosts_content(results, 'extended', multi_ip=True)
-                    self.wfile.write(content.encode())
-                else:
-                    self.wfile.write(b"# Hosts file not generated yet")
-
-            elif path == '/stats':
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json; charset=utf-8')
-                self.end_headers()
-                stats = global_state.get_stats()
-                self.wfile.write(json.dumps(stats, indent=2, ensure_ascii=False).encode())
-
-            elif path == '/health':
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                health = {
-                    'status': 'healthy',
-                    'version': VERSION,
-                    'last_update': global_state.last_update.isoformat() if global_state.last_update else None
-                }
-                self.wfile.write(json.dumps(health).encode())
-
-            else:
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b"404 Not Found")
-
-        except Exception as e:
-            logger.error(f"处理请求失败: {e}")
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Internal Server Error: {e}".encode())
-
-    def _generate_index_page(self) -> str:
-        """生成首页"""
-        stats = global_state.get_stats()
-        return f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>{PROGRAM_NAME} v{VERSION}</title>
-    <meta charset="utf-8">
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
-        .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-        h1 {{ color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }}
-        .stats {{ background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0; }}
-        .endpoint {{ background: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 4px; }}
-        .endpoint code {{ background: #fff; padding: 5px 10px; border-radius: 3px; }}
-        a {{ color: #2196F3; text-decoration: none; }}
-        a:hover {{ text-decoration: underline; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>{PROGRAM_NAME}</h1>
-        <p><strong>版本</strong>: {VERSION}</p>
-        <p><strong>状态</strong>: 🟢 运行中</p>
-
-        <div class="stats">
-            <h3>📊 统计信息</h3>
-            <p><strong>最后更新</strong>: {global_state.last_update.strftime('%Y-%m-%d %H:%M:%S') if global_state.last_update else '未生成'}</p>
-            {f'<p><strong>成功率</strong>: {stats["success_count"]}/{stats["total_domains"]} ({stats["success_rate"]:.1f}%)</p>' if stats else ''}
-            {f'<p><strong>耗时</strong>: {stats["elapsed_time"]:.2f}秒</p>' if stats else ''}
-        </div>
-
-        <h3>🔗 API端点</h3>
-        <div class="endpoint">
-            <strong>GET /hosts</strong><br>
-            获取最新的hosts文件<br>
-            <code>curl http://localhost:{DEFAULT_HTTP_PORT}/hosts</code>
-        </div>
-
-        <div class="endpoint">
-            <strong>GET /stats</strong><br>
-            获取统计信息（JSON格式）<br>
-            <code>curl http://localhost:{DEFAULT_HTTP_PORT}/stats</code>
-        </div>
-
-        <div class="endpoint">
-            <strong>GET /health</strong><br>
-            健康检查<br>
-            <code>curl http://localhost:{DEFAULT_HTTP_PORT}/health</code>
-        </div>
-
-        <h3>📖 使用方法</h3>
-        <pre><code># 下载hosts文件
-curl http://localhost:{DEFAULT_HTTP_PORT}/hosts >> /etc/hosts
-
-# 查看统计
-curl http://localhost:{DEFAULT_HTTP_PORT}/stats | jq</code></pre>
-    </div>
-</body>
-</html>"""
-
-def start_http_server(port: int):
-    """启动HTTP服务器"""
-    try:
-        server = HTTPServer(('0.0.0.0', port), HostsHTTPHandler)
-        logger.info(f"🌐 HTTP服务已启动: http://0.0.0.0:{port}")
-        logger.info(f"   - 访问 http://localhost:{port}/ 查看状态")
-        logger.info(f"   - 访问 http://localhost:{port}/hosts 下载hosts")
-        logger.info(f"   - 访问 http://localhost:{port}/stats 查看统计")
-        server.serve_forever()
-    except Exception as e:
-        logger.error(f"HTTP服务器启动失败: {e}")
-
-# ==================== Daemon模式 ====================
-
-def daemon_worker(args):
-    """Daemon工作线程"""
-    logger.info(f"🔄 Daemon模式启动，更新间隔: {args.interval}秒")
-
-    while global_state.is_running:
-        try:
-            logger.info("开始更新hosts...")
-            generate_hosts_file(
-                args.output,
-                args.level,
-                not args.no_doh,
-                not args.no_cache,
-                not args.no_web,
-                not args.no_multi_ip
-            )
-
-            if args.report:
-                results = global_state.get_results()
-                stats = global_state.get_stats()
-                generate_stats_report(results, stats, 'stats_report.md')
-
-            logger.info(f"✅ 更新完成，下次更新时间: {args.interval}秒后")
-
-            # 等待下一次更新
-            for _ in range(args.interval):
-                if not global_state.is_running:
-                    break
-                time.sleep(1)
-
-        except Exception as e:
-            logger.error(f"Daemon更新失败: {e}")
-            time.sleep(60)  # 失败后等待1分钟
-
-def signal_handler(signum, frame):
-    """信号处理器"""
-    logger.info("\n收到停止信号，正在退出...")
-    global_state.stop()
-    sys.exit(0)
-
 # ==================== 主程序 ====================
 
 def main():
@@ -807,14 +529,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # CLI模式（一次性生成）
+  # 生成扩展级别hosts
   python %(prog)s --level=extended
 
-  # Daemon模式（持续服务）
-  python %(prog)s --daemon --interval=600 --port=8080
-
-  # 生成统计报告
+  # 生成完整级别hosts并生成统计报告
   python %(prog)s --level=full --report
+
+  # 禁用DoH和缓存
+  python %(prog)s --no-doh --no-cache
         """
     )
 
@@ -827,14 +549,6 @@ def main():
     parser.add_argument('--no-web', action='store_true', help='禁用Web爬虫降级')
     parser.add_argument('--no-multi-ip', action='store_true', help='禁用多IP轮询')
     parser.add_argument('--report', action='store_true', help='生成统计报告')
-
-    # Daemon模式参数
-    parser.add_argument('--daemon', action='store_true', help='Daemon模式（持续运行）')
-    parser.add_argument('--interval', type=int, default=DEFAULT_DAEMON_INTERVAL,
-                        help=f'Daemon更新间隔（秒） [默认: {DEFAULT_DAEMON_INTERVAL}]')
-    parser.add_argument('--port', type=int, default=DEFAULT_HTTP_PORT,
-                        help=f'HTTP服务端口 [默认: {DEFAULT_HTTP_PORT}]')
-
     parser.add_argument('--version', action='version', version=f'{PROGRAM_NAME} v{VERSION}')
 
     args = parser.parse_args()
@@ -848,37 +562,20 @@ def main():
         logger.error("请安装: pip install dnspython requests")
         sys.exit(1)
 
-    # 注册信号处理
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     try:
-        if args.daemon:
-            # Daemon模式
-            logger.info(f"🚀 启动 {PROGRAM_NAME} v{VERSION} - Daemon模式")
+        logger.info(f"🚀 启动 {PROGRAM_NAME} v{VERSION}")
 
-            # 启动HTTP服务器线程
-            http_thread = threading.Thread(target=start_http_server, args=(args.port,), daemon=True)
-            http_thread.start()
+        results, stats = generate_hosts_file(
+            args.output,
+            args.level,
+            not args.no_doh,
+            not args.no_cache,
+            not args.no_web,
+            not args.no_multi_ip
+        )
 
-            # 运行Daemon工作线程
-            daemon_worker(args)
-
-        else:
-            # CLI模式
-            logger.info(f"🚀 启动 {PROGRAM_NAME} v{VERSION} - CLI模式")
-
-            results, stats = generate_hosts_file(
-                args.output,
-                args.level,
-                not args.no_doh,
-                not args.no_cache,
-                not args.no_web,
-                not args.no_multi_ip
-            )
-
-            if args.report:
-                generate_stats_report(results, stats, 'stats_report.md')
+        if args.report:
+            generate_stats_report(results, stats, 'stats_report.md')
 
     except KeyboardInterrupt:
         logger.info("\n⚠️ 用户中断")

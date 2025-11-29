@@ -1,50 +1,137 @@
-# Python
+# ==================== Python ====================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 *.egg
-*.egg-info/
-dist/
-build/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Virtual Environment
+# ==================== Virtual Environment ====================
 venv/
 env/
 ENV/
 .venv
+.Python
 
-# IDE
+# ==================== Distribution / Packaging ====================
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+dist/
+build/
+*.whl
+*.egg-info/
+.installed.cfg
+MANIFEST
+
+# ==================== Testing / Coverage ====================
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# ==================== Type Checking ====================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ==================== IDEs / Editors ====================
+# VSCode
 .vscode/
+
+# PyCharm / IntelliJ
 .idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
 *.swp
 *.swo
 *~
-.DS_Store
 
-# OS
+# ==================== OS Specific ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
 Thumbs.db
-*.bak
-*.tmp
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ==================== Logs ====================
+*.log
+*.log.*
+logs/
+
+# ==================== Environment Files ====================
+.env
+.env.local
+.env.*.local
+.python-version
+
+# ==================== Jupyter Notebook ====================
+.ipynb_checkpoints/
+*.ipynb
+
+# ==================== Project Specific ====================
 
 # Cache files
 *.cache
 *.cache.json
 .github_hosts_cache.json
 
-# Logs
-*.log
-
-# Test outputs and Release temp files
+# Generated hosts files
+ultra_hosts
+ultra_hosts.*
+github_hosts_pro
+github_hosts_pro.*
+github_hosts_ultimate
+github_hosts_ultimate.*
 github_hosts_test
 github_hosts_ultimate_test
+
+# Test outputs with numbers
 github_hosts_*[0-9]
 github_hosts_pro_*[0-9]
-*.txt.bak
 
-# Temporary files
+# Statistics and reports
+stats_report.md
+stats_report_*.md
+
+# Backup files
+*.bak
+*.tmp
+*.txt.bak
+hosts.backup*
+/etc/hosts.backup*
+
+# Temporary directories
 temp/
 tmp/
+.temp/
+
+# ==================== Keep These ====================
+# !github_domains.json  (keep domain config)
+# !README.md           (keep documentation)
+# !DOMAINS.md          (keep documentation)
+# !requirements.txt    (keep dependencies)

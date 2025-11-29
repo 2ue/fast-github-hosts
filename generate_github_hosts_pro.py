@@ -22,182 +22,37 @@ import sys
 
 # ==================== 配置区 ====================
 
-# 域名分级配置
-DOMAIN_LEVELS = {
-    'core': [
-        # ===== 核心服务（20个）- 必须成功 =====
-        'github.com',
-        'api.github.com',
-        'gist.github.com',
-        'codeload.github.com',
-        'github.blog',
-        'github.community',
-        'github.dev',
-        'alive.github.com',
-        'live.github.com',
-        'education.github.com',
+# 域名配置文件路径
+DOMAINS_FILE = 'github_domains.json'
 
-        # ===== CDN与静态资源（5个）=====
-        'github.githubassets.com',
-        'github.io',
-        'github.map.fastly.net',
-        'github.global.ssl.fastly.net',
-        'githubstatus.com',
+def load_github_domains() -> List[str]:
+    """从配置文件加载GitHub域名列表"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        domains_path = os.path.join(script_dir, DOMAINS_FILE)
 
-        # ===== UserContent核心（5个）=====
-        'raw.githubusercontent.com',
-        'objects.githubusercontent.com',
-        'avatars.githubusercontent.com',
-        'camo.githubusercontent.com',
-        'user-images.githubusercontent.com',
-    ],
+        with open(domains_path, 'r', encoding='utf-8') as f:
+            domains = json.load(f)
 
-    'extended': [
-        # ===== 更多UserContent（16个）=====
-        'raw.github.com',
-        'objects-origin.githubusercontent.com',
-        'release-assets.githubusercontent.com',
-        'github-releases.githubusercontent.com',
-        'github-registry-files.githubusercontent.com',
-        'avatars0.githubusercontent.com',
-        'avatars1.githubusercontent.com',
-        'avatars2.githubusercontent.com',
-        'avatars3.githubusercontent.com',
-        'avatars4.githubusercontent.com',
-        'avatars5.githubusercontent.com',
-        'private-user-images.githubusercontent.com',
-        'cloud.githubusercontent.com',
-        'desktop.githubusercontent.com',
-        'favicons.githubusercontent.com',
-        'media.githubusercontent.com',
-        'pkg-containers.githubusercontent.com',
+        return domains
+    except FileNotFoundError:
+        print(f"❌ 错误: 找不到域名配置文件 {DOMAINS_FILE}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"❌ 错误: 域名配置文件格式错误 - {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ 错误: 加载域名配置失败 - {e}")
+        sys.exit(1)
 
-        # ===== 包管理器（13个）=====
-        'ghcr.io',
-        'maven.pkg.github.com',
-        'npm.pkg.github.com',
-        'npm-proxy.pkg.github.com',
-        'npm-beta.pkg.github.com',
-        'npm-beta-proxy.pkg.github.com',
-        'nuget.pkg.github.com',
-        'rubygems.pkg.github.com',
-        'pypi.pkg.github.com',
-        'swift.pkg.github.com',
-        'docker.pkg.github.com',
-        'docker-proxy.pkg.github.com',
-        'containers.pkg.github.com',
+# 加载所有域名
+ALL_DOMAINS = load_github_domains()
 
-        # ===== AWS S3存储（5个）=====
-        'github-cloud.s3.amazonaws.com',
-        'github-com.s3.amazonaws.com',
-        'github-production-release-asset-2e65be.s3.amazonaws.com',
-        'github-production-user-asset-6210df.s3.amazonaws.com',
-        'github-production-repository-file-5c1aeb.s3.amazonaws.com',
-
-        # ===== GitHub Copilot（7个）=====
-        'githubcopilot.com',
-        'api.githubcopilot.com',
-        'api.individual.githubcopilot.com',
-        'copilot-proxy.githubusercontent.com',
-        'copilot-telemetry.githubusercontent.com',
-        'default.exp-tas.com',
-        'collector.github.com',
-        'central.github.com',
-    ],
-
-    'optional': [
-        # ===== GitHub Actions核心（9个）=====
-        'pipelines.actions.githubusercontent.com',
-        'vstoken.actions.githubusercontent.com',
-        'broker.actions.githubusercontent.com',
-        'launch.actions.githubusercontent.com',
-        'runner-auth.actions.githubusercontent.com',
-        'tokenghub.actions.githubusercontent.com',
-        'setup-tools.actions.githubusercontent.com',
-        'pkg.actions.githubusercontent.com',
-        'results-receiver.actions.githubusercontent.com',
-        'mpsghub.actions.githubusercontent.com',
-
-        # ===== Actions Pipelines（28个）=====
-        'pipelinesghubeus1.actions.githubusercontent.com',
-        'pipelinesghubeus2.actions.githubusercontent.com',
-        'pipelinesghubeus3.actions.githubusercontent.com',
-        'pipelinesghubeus4.actions.githubusercontent.com',
-        'pipelinesghubeus5.actions.githubusercontent.com',
-        'pipelinesghubeus6.actions.githubusercontent.com',
-        'pipelinesghubeus7.actions.githubusercontent.com',
-        'pipelinesghubeus8.actions.githubusercontent.com',
-        'pipelinesghubeus9.actions.githubusercontent.com',
-        'pipelinesghubeus10.actions.githubusercontent.com',
-        'pipelinesghubeus11.actions.githubusercontent.com',
-        'pipelinesghubeus12.actions.githubusercontent.com',
-        'pipelinesghubeus13.actions.githubusercontent.com',
-        'pipelinesghubeus14.actions.githubusercontent.com',
-        'pipelinesghubeus15.actions.githubusercontent.com',
-        'pipelinesghubeus20.actions.githubusercontent.com',
-        'pipelinesghubeus21.actions.githubusercontent.com',
-        'pipelinesghubeus22.actions.githubusercontent.com',
-        'pipelinesghubeus23.actions.githubusercontent.com',
-        'pipelinesghubeus24.actions.githubusercontent.com',
-        'pipelinesghubeus25.actions.githubusercontent.com',
-        'pipelinesghubeus26.actions.githubusercontent.com',
-        'pipelinesproxcnc1.actions.githubusercontent.com',
-        'pipelinesproxcus1.actions.githubusercontent.com',
-        'pipelinesproxeau1.actions.githubusercontent.com',
-        'pipelinesproxsdc1.actions.githubusercontent.com',
-        'pipelinesproxweu1.actions.githubusercontent.com',
-        'pipelinesproxwus31.actions.githubusercontent.com',
-
-        # ===== Actions Runners（12个）=====
-        'runnerghubeus1.actions.githubusercontent.com',
-        'runnerghubeus20.actions.githubusercontent.com',
-        'runnerghubeus21.actions.githubusercontent.com',
-        'runnerghubwus31.actions.githubusercontent.com',
-        'runnerproxcnc1.actions.githubusercontent.com',
-        'runnerproxcus1.actions.githubusercontent.com',
-        'runnerproxeau1.actions.githubusercontent.com',
-        'runnerproxsdc1.actions.githubusercontent.com',
-        'runnerproxweu1.actions.githubusercontent.com',
-        'run-actions-1-azure-eastus.actions.githubusercontent.com',
-        'run-actions-2-azure-eastus.actions.githubusercontent.com',
-        'run-actions-3-azure-eastus.actions.githubusercontent.com',
-
-        # ===== Azure Blob存储 - Actions结果（20个）=====
-        'productionresultssa0.blob.core.windows.net',
-        'productionresultssa1.blob.core.windows.net',
-        'productionresultssa2.blob.core.windows.net',
-        'productionresultssa3.blob.core.windows.net',
-        'productionresultssa4.blob.core.windows.net',
-        'productionresultssa5.blob.core.windows.net',
-        'productionresultssa6.blob.core.windows.net',
-        'productionresultssa7.blob.core.windows.net',
-        'productionresultssa8.blob.core.windows.net',
-        'productionresultssa9.blob.core.windows.net',
-        'productionresultssa10.blob.core.windows.net',
-        'productionresultssa11.blob.core.windows.net',
-        'productionresultssa12.blob.core.windows.net',
-        'productionresultssa13.blob.core.windows.net',
-        'productionresultssa14.blob.core.windows.net',
-        'productionresultssa15.blob.core.windows.net',
-        'productionresultssa16.blob.core.windows.net',
-        'productionresultssa17.blob.core.windows.net',
-        'productionresultssa18.blob.core.windows.net',
-        'productionresultssa19.blob.core.windows.net',
-
-        # ===== Azure Blob存储 - 包管理器（4个）=====
-        'mavenregistryv2prod.blob.core.windows.net',
-        'npmregistryv2prod.blob.core.windows.net',
-        'nugetregistryv2prod.blob.core.windows.net',
-        'rubygemsregistryv2prod.blob.core.windows.net',
-
-        # ===== 安全认证（3个）=====
-        'tuf-repo.github.com',
-        'fulcio.githubapp.com',
-        'timestamp.githubapp.com',
-
-        # ===== 开发工具（1个）=====
-        'vscode.dev',
-    ]
+# 域名分级数量配置(基于ALL_DOMAINS的切片而非硬编码分组)
+DOMAIN_COUNT = {
+    'core': 30,       # 核心域名:前30个
+    'extended': 70,   # 扩展域名:前70个
+    'full': len(ALL_DOMAINS)  # 全部域名
 }
 
 # DoH服务器列表（DNS-over-HTTPS）- 2025年最佳实践
@@ -590,7 +445,7 @@ def get_fastest_ips(domain: str, use_doh: bool = True, use_cache: bool = True) -
 
 def get_domain_list(level: str) -> List[str]:
     """
-    根据级别获取域名列表
+    根据级别获取域名列表(从ALL_DOMAINS中按数量切片)
 
     Args:
         level: 'core', 'extended', 'full'
@@ -598,14 +453,8 @@ def get_domain_list(level: str) -> List[str]:
     Returns:
         域名列表
     """
-    if level == 'core':
-        return DOMAIN_LEVELS['core']
-    elif level == 'extended':
-        return DOMAIN_LEVELS['core'] + DOMAIN_LEVELS['extended']
-    elif level == 'full':
-        return DOMAIN_LEVELS['core'] + DOMAIN_LEVELS['extended'] + DOMAIN_LEVELS['optional']
-    else:
-        return DOMAIN_LEVELS['core']
+    count = DOMAIN_COUNT.get(level, DOMAIN_COUNT['core'])
+    return ALL_DOMAINS[:count]
 
 
 def generate_hosts_file(
